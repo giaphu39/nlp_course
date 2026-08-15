@@ -75,3 +75,24 @@ debian/reproducible-experiment-platform
 debian/files
 *.substvars
 *.debhelper.log
+
+# Model weights and fine-tuning outputs
+*.pt
+*.pth
+*.bin
+*.safetensors
+*.ckpt
+*.h5
+*.pb
+*.onnx
+
+# Hugging Face Peft and Adapter configs
+adapter_config.json
+adapter_model.bin
+adapter_model.safetensors
+
+# Training logs and outputs
+runs/
+wandb/
+tensorboard/
+checkpoints/
