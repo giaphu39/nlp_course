@@ -26,8 +26,11 @@ Xây dựng ma trận từ - ngữ cảnh (word-context matrix) thủ công dự
   - Ma trận chứa tần suất xuất hiện đồng thời trực tiếp của các cặp từ.
 - **PPMI (Positive Pointwise Mutual Information):**
   - Thay vì đếm trực tiếp, mô hình đo lường mức độ liên kết chặt chẽ giữa từ $w$ và ngữ cảnh $c$:
-    $$PMI(w, c) = \log \frac{P(w, c)}{P(w)P(c)}$$
-    $$PPMI(w, c) = \max(0, PMI(w, c))$$
+
+$$PMI(w, c) = \log \frac{P(w, c)}{P(w)P(c)}$$
+
+$$PPMI(w, c) = \max(0, PMI(w, c))$$
+
   - Giúp loại bỏ ảnh hưởng của các từ quá phổ biến nhưng ít mang thông tin (như "the", "a").
 - **LSA (Latent Semantic Analysis):**
   - Áp dụng phân tích suy hao trị riêng SVD (Singular Value Decomposition) lên ma trận term-document nhằm biểu diễn các tài liệu và thuật ngữ dưới dạng các chủ đề ẩn (latent topics).
@@ -38,13 +41,19 @@ Xây dựng ma trận từ - ngữ cảnh (word-context matrix) thủ công dự
 Ý tưởng: **Học** vector từ bằng cách tối ưu hóa các tham số để đi dự đoán từ ngữ cảnh xung quanh.
 
 - **Hàm mục tiêu (Loss function):** Average Negative Log-Likelihood trên một cửa sổ trượt kích thước $m$:
-  $$J(\theta) = -\frac{1}{T} \sum_{t=1}^T \sum_{-m \le j \le m, j \neq 0} \log P(w_{t+j} | w_t)$$
+
+$$J(\theta) = -\frac{1}{T} \sum_{t=1}^T \sum_{-m \le j \le m, j \neq 0} \log P(w_{t+j} | w_t)$$
+
 - **Cách tính xác suất qua Softmax:**
   Mỗi từ có 2 vector: $v_w$ khi đóng vai trò là từ trung tâm (center word) and $u_w$ khi đóng vai trò là từ ngữ cảnh (context word).
+
   $$P(o|c) = \frac{\exp(u_o^T v_c)}{\sum_{w \in V} \exp(u_w^T v_c)}$$
+
 - **Tối ưu hóa tốc độ huấn luyện:**
   - **Negative Sampling (SGNS):** Việc tính mẫu số của Softmax trên toàn bộ từ điển $V$ cực kỳ tốn kém ($O(|V|)$). SGNS chuyển bài toán đa phân loại thành phân loại nhị phân: tăng độ tương đồng giữa từ trung tâm với từ ngữ cảnh thật (1 positive), đồng thời giảm độ tương đồng với $K$ từ ngẫu nhiên được chọn (K negatives).
-    $$J_{t, j}(\theta) = -\log \sigma(u_o^T v_c) - \sum_{w\in \text{Neg}} \log \sigma(-u_w^T v_c)$$
+
+$$J_{t, j}(\theta) = -\log \sigma(u_o^T v_c) - \sum_{w\in \text{Neg}} \log \sigma(-u_w^T v_c)$$
+
   - **Lựa chọn mẫu tiêu cực (Negative Examples):** Chọn ngẫu nhiên theo phân phối tần suất lũy thừa $U^{3/4}(w)$ để tăng cơ hội lấy các từ hiếm làm mẫu tiêu cực.
 - **Hai biến thể của Word2Vec:**
   - **Skip-Gram:** Dự đoán các từ ngữ cảnh từ từ trung tâm (phổ biến hơn và hiệu quả hơn với từ hiếm).
@@ -58,7 +67,9 @@ Xây dựng ma trận từ - ngữ cảnh (word-context matrix) thủ công dự
 ### 4. GloVe (Global Vectors for Word Representation)
 - Kết hợp cả hai hướng tiếp cận: dựa trên đếm (counts) và dựa trên dự đoán (prediction).
 - Hàm loss tối ưu trực tiếp trên ma trận đồng xuất hiện toàn cục $X_{ij}$:
-  $$J = \sum_{i,j=1}^V f(X_{ij}) (w_i^T \tilde{w}_j + b_i + \tilde{b}_j - \log X_{ij})^2$$
+
+$$J = \sum_{i,j=1}^V f(X_{ij}) (w_i^T \tilde{w}_j + b_i + \tilde{b}_j - \log X_{ij})^2$$
+
   Trong đó $f(X_{ij})$ là hàm trọng số nhằm phạt các cặp từ quá hiếm và giới hạn ảnh hưởng của các cặp từ quá phổ biến.
 
 ---
@@ -93,7 +104,9 @@ Xây dựng ma trận từ - ngữ cảnh (word-context matrix) thủ công dự
 Học tự động đặc trưng biểu diễn văn bản từ chuỗi vector nhúng thay vì định nghĩa đặc trưng thủ công.
 
 - **Luồng hoạt động chung:**
-  $$\text{Từ} \rightarrow \text{Word Embeddings} \rightarrow \text{Neural Network (RNN/CNN)} \rightarrow \text{Vector biểu diễn văn bản cố định } (d) \rightarrow \text{Linear Layer} \rightarrow \text{Softmax} \rightarrow \text{Xác suất nhãn}$$
+
+$$\text{Từ} \rightarrow \text{Word Embeddings} \rightarrow \text{Neural Network (RNN/CNN)} \rightarrow \text{Vector biểu diễn văn bản cố định } (d) \rightarrow \text{Linear Layer} \rightarrow \text{Softmax} \rightarrow \text{Xác suất nhãn}$$
+
 - **Các kiến trúc phổ biến:**
   - **Bag of Embeddings (BOE):** Cộng hoặc trung bình cộng các vector nhúng của từ trong văn bản. Không giữ thứ tự từ nhưng giữ được quan hệ ngữ nghĩa tốt hơn nhiều so với Bag of Words.
   - **Mô hình tuần tự (Recurrent - RNN/LSTM/GRU):** Đọc văn bản theo thứ tự từ trái qua phải. Lấy trạng thái ẩn cuối cùng $h_{\text{last}}$ làm vector đại diện cho toàn bộ văn bản. Có thể xếp chồng nhiều lớp (Multi-layer) hoặc chạy hai chiều (Bidirectional) để tối ưu khả năng nhớ thông tin.
