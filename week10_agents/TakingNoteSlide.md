@@ -1,0 +1,366 @@
+# Ghi chú kiến thức: LLM-Agents and more
+
+> Nguồn: `slides.pdf` — Yandex School of Data Analysis, Iaroslav Khripkov
+> Chủ đề: Week 10 — AI Agents
+
+---
+
+## 1. TLDR: LLM-Agent là gì?
+
+Một LLM-Agent gồm 4 thành phần cơ bản:
+
+1. **LLM** (model ngôn ngữ)
+2. **Prompt** (lời hướng dẫn)
+3. **Tools** (công cụ) — có thể có hoặc không
+4. **Reasoning** (khả năng suy luận) — có thể có hoặc không
+
+---
+
+## 2. Động lực (Motivation)
+
+> **Ý tưởng chính:** LLM rất mạnh nhưng giống như "bộ não thiên tài bị nhốt trong một căn phòng" — không thể tương tác với thế giới bên ngoài.
+
+### Các hạn chế cốt lõi của LLM thường:
+- **Thiếu hành động & sử dụng công cụ:** Không thể chạy code, tính toán, hay tương tác với thế giới bên ngoài. Chỉ tạo ra văn bản.
+- **Kiến thức tĩnh:** Kiến thức "đóng băng" tại thời điểm huấn luyện cuối cùng → dẫn tới thông tin lỗi thời hoặc "hallucinated" (bịa).
+- **Bối cảnh & bộ nhớ hạn chế:** Không có bộ nhớ dài hạn thực sự ngoài cửa sổ context của một cuộc hội thoại.
+- **Mô hình tương tác bị động:** Không thể tự khởi xướng tác vụ, tìm kiếm phản hồi, hay hoạt động tự chủ trong thời gian dài. Mỗi lượt phải được nhắc.
+- **Khó giao diện:** Không có khả năng truy cập API, database, hay hệ thống file.
+- **Cần giám sát:** Đòi hỏi sự hướng dẫn của con người cho các tác vụ phức tạp nhiều bước và cần cấp quyền cho các hành động quan trọng.
+
+---
+
+## 3. AI Agent là gì?
+
+> AI agents là các hệ thống phần mềm dùng AI để theo đuổi mục tiêu và hoàn thành tác vụ thay cho người dùng. Chúng có khả năng **suy luận (reasoning), lập kế hoạch (planning), ghi nhớ (memory)** và có **mức độ tự chủ (autonomy)** để ra quyết định, học hỏi và thích nghi.
+
+### Các mức Agency (mức độ tự chủ của LLM):
+
+| Mức | Mô tả | Loại | Ví dụ code |
+|-----|-------|------|-----------|
+| ★☆☆ | Đầu ra LLM không ảnh hưởng tới luồng chương trình | Simple processor | `process_llm_output(llm_response)` |
+| ★☆☆ | Đầu ra LLM điều khiển if/else | Router | `if llm_decision(): path_a() else: path_b()` |
+| ★★☆ | Đầu ra LLM điều khiển việc gọi hàm | Tool call | `run_function(llm_chosen_tool, llm_chosen_args)` |
+| ★★☆ | Đầu ra LLM điều khiển vòng lặp và tiếp tục chương trình | Multi-step Agent | `while llm_should_continue(): execute_next_step()` |
+| ★★★ | Một agentic workflow khởi động một agentic workflow khác | Multi-Agent | `if llm_trigger(): execute_agent()` |
+| ★★★ | LLM hoạt động trong code, tự định nghĩa tool / khởi động agent khác | Code Agents | `def custom_tool(args): ...` |
+
+---
+
+## 4. Tiền thân của LLM-Agents
+
+### 4.1. WebGPT
+- Model dựa trên GPT-3, được fine-tune để trả lời câu hỏi ELI5 (Explain Like I'm 5) sử dụng môi trường web.
+- ArXiv: 2112.09332
+
+### 4.2. HuggingGPT / JARVIS
+- Giải các tác vụ AI bằng cách phối hợp ChatGPT với các model khác trong Hugging Face.
+- ArXiv: 2303.17580
+- **Ý nghĩa:** Cho thấy model chỉ dùng text có thể tương tác với các model khác do cộng đồng ML phát triển, mở rộng khả năng ứng dụng.
+
+---
+
+## 5. Tooling (Công cụ)
+
+### 5.1. Các tool phổ biến
+- **Web Search:** Truy cập thông tin thời gian thực.
+  - Google API, Serp, Yandex, **Tavily** (thiết kế riêng cho LLM)
+- **Code Interpreter:** Chạy code để tính toán, phân tích dữ liệu, thao tác file.
+  - Python sandbox, Bash, JS...
+- **Database Query:** Lấy dữ liệu có cấu trúc từ SQL/NoSQL.
+  - Postgres, Clickhouse...
+- **External APIs:** Tương tác với mọi dịch vụ (GitHub, Spotify, hệ thống nội bộ).
+- **Retrieval:** Tìm kiếm trên kho tri thức riêng (ví dụ dùng vector database).
+  - Confluence/Wiki, Vector DB trên tài liệu
+
+### 5.2. Ba cách cung cấp tool cho model
+
+#### Cách 1: Python API interface (openai)
+```python
+from openai import OpenAI
+import json
+
+client = OpenAI()
+
+# 1. Định nghĩa danh sách tool
+tools = [
+    {
+        "type": "function",
+        "name": "get_horoscope",
+        "description": "Get today's horoscope for an astrological sign.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "sign": {"type": "string", "description": "An astrological sign like Taurus or Aquarius"},
+            },
+            "required": ["sign"],
+        },
+    },
+]
+
+input_list = [{"role": "user", "content": "What is my horoscope? I am an Aquarius."}]
+
+# 2. Gọi model với tools
+response = client.responses.create(model="gpt-5", tools=tools, input=input_list)
+input_list += response.output
+
+for item in response.output:
+    if item.type == "function_call":
+        if item.name == "get_horoscope":
+            # 3. Thực thi hàm
+            horoscope = get_horoscope(json.loads(item.arguments))
+            # 4. Trả kết quả cho model
+            input_list.append({
+                "type": "function_call_output",
+                "call_id": item.call_id,
+                "output": json.dumps({"horoscope": horoscope})
+            })
+
+# 5. Model đưa ra câu trả lời cuối
+response = client.responses.create(
+    model="gpt-5",
+    instructions="Respond only with a horoscope generated by a tool.",
+    tools=tools,
+    input=input_list,
+)
+print(response.output_text)
+```
+
+#### Cách 2: OpenAI API interface (raw JSON)
+- Dùng `tools` array với `type: "function"`, và trong `input` thêm các message:
+  - `assistant` với nội dung kiểu `function_call` (name, arguments, call_id)
+  - `function_call_output` (call_id + output)
+
+#### Cách 3: LLM Chat template
+- Đóng gói tool signature trong thẻ XML `<tools>...</tools>`
+- LLM phản hồi lời gọi tool trong thẻ `<tool_call>...</tool_call>`
+- Kết quả tool được trả về trong thẻ `<tool_response>...</tool_response>`
+
+### 5.3. MCP (Model Context Protocol)
+- **MCP là bộ kết nối phổ quát** cho phép model truy cập tools (và thứ khác), do Anthropic phát triển.
+- Trở nên phổ biến nhờ kết nối model với tools một cách tiện lợi.
+
+**Lợi ích chính:**
+1. Rất nhiều community servers
+2. Tiêu chuẩn hóa (standardization)
+3. Dễ sử dụng
+4. Mọi framework agentic lớn đều hỗ trợ MCP
+5. Giảm thời gian đưa ra thị trường (time to market)
+
+### 5.4. Huấn luyện model sử dụng tool
+
+| Phương pháp | Mô tả | ArXiv |
+|------------|-------|-------|
+| **Toolformer** | GPT-J (6.7B) fine-tune trên dataset tổng hợp có chèn api calls từ text thường dùng LLM markup | 2302.04761 |
+| **APIGen** / **APIGen-MT** | Pipeline tự động tạo dataset function-calling đa dạng, có thể xác minh. APIGen-MT cho multi-turn qua "Simulated Agent-Human Interplay" | 2406.18518 / 2504.03601 |
+| **ToolACE** | Nâng cao khả năng function calling của LLM | 2409.00920 |
+
+---
+
+## 6. Memory (Bộ nhớ)
+
+> **Memory** là hệ thống ghi nhớ thông tin về các tương tác trước đó.
+
+**Động lực:** Agent cần nhớ các tương tác trước, học từ phản hồi, và thích nghi với sở thích người dùng.
+
+### Các loại bộ nhớ dài hạn:
+- **Episodic Memory:** Nhớ các sự kiện cụ thể trong quá khứ (ví dụ ngày sinh của người dùng đã dùng trong cuộc trò chuyện trước). Dùng làm context trong các tương tác sau.
+- **Semantic Memory:** Giữ kiến thức chung về thế giới hoặc những gì AI học được qua tương tác. Dùng để xử lý vấn đề mới hiệu quả.
+- **Procedural Memory:** Lưu các bước "how-to" / quy tắc ra quyết định (ví dụ quy trình giải bài toán, dùng lại cho bài tương tự).
+
+---
+
+## 7. Multi-step Agents
+
+### Vanilla agent có nhược điểm:
+- Gọi tool từng cái một
+- Có thể thiếu khả năng suy luận
+- Ít cơ hội phản ánh (reflection)
+- Instructions và bộ nhớ bị quá tải
+
+### 7.1. ReAct (Reasoning + Acting)
+- **Ý tưởng chính:** Để LLM **suy luận trước (reason), thực hiện hành động (act), rồi quan sát kết quả (observe)**.
+- Chủ yếu là kỹ thuật prompting và xử lý response.
+- ArXiv: 2210.03629
+
+**Vòng lặp ReAct:**
+```
+Thought: bạn nên suy nghĩ phải làm gì
+Action: {tool JSON}
+Observation: kết quả của action
+... (lặp lại nhiều lần)
+Thought: Tôi đã biết câu trả lời cuối
+Final Answer: câu trả lời cuối
+```
+
+**Ví dụ thực tế (Olivia Wilde):**
+- Turn 1: `Thought: cần search. Action: {"action": "Search", "action_input": "Olivia Wilde boyfriend"}`
+- Observation: Harry Styles
+- Turn 2: `Action: {"action": "Search", "action_input": "Harry Styles age"}` → Observation: 29
+- Turn 3: `Action: {"action": "Calculator", "action_input": "29^0.23"}` → Observation: 2.169459462491557
+- Final Answer: `2.169459462491557`
+
+### 7.2. CodeAct
+- Thay thế lời gọi tool dạng JSON bằng **việc thực thi code Python**, nhưng vẫn giữ không gian cho suy luận và hội thoại tự nhiên.
+- ArXiv: 2402.01030
+
+---
+
+## 8. Multi-Agent Systems (MAS)
+
+### Tại sao cần MAS?
+Trong single-agent, gặp các vấn đề:
+1. Không thể đổi system prompt/model của agent.
+2. Một agent mạnh duy nhất khó fine-tune hơn một phần nhỏ của MAS.
+3. Model bị "quá tải" với tools và trách nhiệm.
+4. Agent đa dụng thường cần model lớn hơn.
+
+### Control & context flow
+**Các khối chính:**
+- **Workflow Agent:** Thứ tự gọi agent cố định.
+- **LLM Agent:** Model quyết định có dùng agent khác hay không.
+
+**Các kiểu control flow:**
+- **Handoff:** Chuyển toàn bộ quyền điều khiển và context sang agent khác.
+- **Agent-as-tool:** Gọi agent và trả về response ngay lập tức. Thường không truyền context.
+
+### 8.1. Collaboration — Voting & Debate
+- **Voting / Consensus:** Các agent bỏ phiếu hoặc tranh luận để đưa ra quyết định (Decision-Making in Multi-Agent Debate, Kaesberg et al.).
+
+---
+
+## 9. Training agents
+
+### 9.1. AgentFlow & FlowGRPO
+Cách huấn luyện agent modular dùng tool cho tác vụ multi-step reasoning phức tạp:
+- **AgentFlow:** Planner, Executor, Verifier, Generator giao tiếp qua memory.
+- **"in the flow"** on-policy training chỉ với final binary reward cho mỗi trajectory.
+- **Flow-GRPO:** thuật toán RL dựa trên GRPO, gán cùng một terminal reward cho tất cả các bước trong trajectory với group-normalized advantages.
+- **LLM judge** chấm điểm câu trả lời cuối.
+- AgentFlow 7B huấn luyện với Flow-GRPO **vượt GPT-4o** trên nhiều benchmark tool-use và reasoning.
+- ArXiv: 2510.05592
+
+### 9.2. DeepAgent & ToolPO
+DeepAgent — một agent hợp nhất tự điều khiển reasoning, tools và memory cho tác vụ dài, phức tạp.
+
+**Kiến trúc & cơ chế:**
+- **Single reasoning stream:** suy nghĩ, tool search, tool calls, memory folding (không có vòng lặp ReAct ngoài).
+- **Toolset retrieval:** retriever ánh xạ text query tới API liên quan theo nhu cầu.
+- **Structured memory folding:** định kỳ cô đọng lịch sử thành JSON gọn.
+- **Unified tool interface:** mọi tool dùng chung protocol `<tool_search>` / `<tool_call>` / `<*_result>`.
+- **Main reasoning + non-thinking auxiliary LLM.**
+
+**Training (ToolPO):**
+- **Tool simulator environment:** một LLM riêng mô phỏng API thật → RL rẻ và ổn định trên nhiều tình huống tool-use.
+- **ToolPO algorithm:** thuật toán phong cách PPO chuyên cho tool-use và memory ops.
+- **Split rewards:** task-level reward (thành công cuối) + action-level reward (chất lượng từng tool/memory op).
+- **Dual advantage attribution:** global advantage áp cho mọi token, action advantage chỉ áp cho token tool/memory.
+- **RL fine-tuning:** tối ưu trên các tín hiệu này → tool use hiệu quả và đáng tin cậy hơn.
+- ArXiv: 2510.21618
+
+---
+
+## 10. Agentic RAG
+
+> Nguồn: arXiv:2501.09136
+
+- **Single Agent RAG:** Một agent duy nhất xử lý retrieval + generation.
+- **Multi-Agent RAG:** Nhiều agent phân chia nhiệm vụ retrieval.
+- **Adaptive Agentic RAG:** Agent tự quyết định khi nào cần retrieval / khi nào trả lời trực tiếp.
+
+---
+
+## 11. Eval (Đánh giá)
+
+### 11.1. Function calling benchmarks
+- **BFCL** (Berkeley Function Calling Leaderboard) — benchmark phổ biến nhất.
+- **ToolBench:** benchmark tool-use lớn với hàng nghìn REST API thật.
+- **API-Bank:** nhỏ hơn nhưng sạch, hàng chục API.
+- **RestBench–TMDB/Spotify:** tập trung hẹp (tool video/audio).
+- **ToolHop:** chuyên cho tool-use multi-hop (mỗi query cần nhiều tool call phụ thuộc nhau).
+- **GAIA** (General AI Assistant): tác vụ trợ lý thực tế (code, web search, data files, multimodal).
+
+### 11.2. Agent benchmarks
+- **GAIA:** như trên.
+- **ALFWorld:** môi trường gia đình dạng text — agent hoàn thành tác vụ như "rửa táo và bỏ vào tủ lạnh" qua các lệnh từng bước.
+- **WebShop:** trang thương mại điện tử mô phỏng + chỉ dẫn mua sắm tự nhiên ("mua giày chạy đen rẻ, rating > 4.5").
+- **τ-bench (Tau-bench):** tác vụ theo domain (airline/retail) với API & policies thực tế — agent phải hội thoại, hỏi làm rõ, gọi tool.
+- **τ²-bench:** mở rộng τ-bench cho dual-control — cả agent và user đều có tool và cùng tác động tới trạng thái môi trường.
+
+---
+
+## 12. Frameworks & AgentOps
+
+### Popular Agentic Frameworks
+- OpenAI Agents SDK, smolagents (HuggingFace), LangGraph/LangChain, v.v.
+
+### AgentOps platforms (CometML Opik, LangSmith)
+- **Tracing:** theo dõi luồng gọi.
+- **Evaluation:** đánh giá.
+- **Prompt playgrounds:** thử nghiệm prompt.
+- **Monitoring:** giám sát.
+
+---
+
+## 13. Ứng dụng hiện tại & tiềm năng
+
+- **Software Development:** agent viết, debug, test code. (Cursor, Copilot, Devin)
+- **Business Automation:** xử lý customer support, lên lịch họp, phân tích sales. (Fin.AI, các giải pháp tùy chỉnh Yandex/Avito)
+- **Personal Productivity:** trợ lý cá nhân "làm mọi thứ". (n8n workflows, Cleo, OpenAI GPTs, FitBit AI)
+- **Scientific Research:** đọc paper, chạy simulation, phân tích dữ liệu. (AlphaXiv, Paper2Agent)
+- **Gaming & Entertainment:** NPC thông minh. (Inworld AI, Convai, Replika)
+
+---
+
+## 14. Insights từ doanh nghiệp — Anthropic on deep research
+
+- **Kiến trúc:** 1 coordinator + nhiều worker agents chuyên biệt chạy song song, mỗi agent có context riêng.
+- **Điểm mạnh:** Xử lý tác vụ mở, nơi không thể định nghĩa trước workflow từng bước.
+- **Chi phí:** ~15× token usage so với single-agent chat → cần cân nhắc hiệu quả chi phí.
+- **Thách thức production:**
+  - Stateful agents tích lũy lỗi → cần checkpoints và recovery an toàn.
+  - Triển khai update khó vì agent có thể đang giữa tác vụ.
+  - Debug khó hơn do reasoning phi tuyến tính và nhiều agent tương tác → cần observability mạnh.
+- **Best practices:**
+  - Cung cấp role, mục tiêu, output format rõ ràng cho worker agents.
+  - Dùng parallelism cẩn thận để cân bằng tốc độ với độ phức tạp phối hợp.
+  - Đánh giá theo chất lượng output cuối, không theo logic bước nội bộ.
+
+---
+
+## 15. Mối quan tâm & Đạo đức
+
+- **Security:** Agent có thể gọi API → có thể gây hại. Giải pháp: Human-in-the-loop, Guardrails.
+- **Reliability & Alignment:** Đảm bảo agent bám sát mục tiêu, không chạy theo mục tiêu không mong muốn. (Paperclip Maximizer — thí nghiệm tư duy về AI misaligned.)
+- **Data Privacy:** Agent kết nối dữ liệu cá nhân (email, file) → rủi ro riêng tư lớn.
+- **Scalability & Cost:** Vòng lặp agent phức tạp tốn kém. Giải pháp: **small language models là tương lai của Agentic AI** (arXiv:2506.02153).
+
+---
+
+## 16. Kết luận
+
+> LLM Agents đại diện cho sự chuyển đổi căn bản từ trình tạo văn bản thụ động sang người tham gia tích cực trong thế giới số. Mặc dù công nghệ còn sơ khai, tiềm năng cách mạng hóa cách con người tương tác với máy tính và tự động hóa các tác vụ phức tạp là rất lớn.
+
+---
+
+## 17. Phụ lục: MCP under the hood
+
+### Giao tiếp trong MCP
+- JSON RPC messages trên **SSE / stdio / Streamable HTTP**.
+- Schema Request điển hình.
+
+### Client features
+- **Roots:** (danh sách thư mục gốc client cho phép)
+- **Sampling:** (model có thể yêu cầu client tạo output)
+
+### Server features
+
+| Primitive | Control | Mô tả | Ví dụ |
+|-----------|---------|-------|-------|
+| **Prompts** | User-controlled | Template tương tác do người dùng chọn | Slash commands, menu options |
+| **Resources** | Application-controlled | Dữ liệu ngữ cảnh do client gắn và quản lý | File contents, git history |
+| **Tools** | Model-controlled | Hàm được expose cho LLM để thực hiện hành động | API POST requests, file writing |
+
+- **Prompts Message Flow:** người dùng chọn prompt → server trả về template/args.
+- **Resources Message Flow:** client đọc resource từ server.
+- **Tools Message Flow:** model gọi tool → server thực thi → trả kết quả.
